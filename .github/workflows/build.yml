@@ -1,4 +1,4 @@
-name: Build APK
+name: Build HansViewer
 
 on:
   push:
@@ -25,35 +25,28 @@ jobs:
 
       - name: Unpack uploaded zip
         run: |
-          ls -la
           ZIP=$(find . -name '*.zip' -not -path './.git/*' | head -1)
-          if [ -n "$ZIP" ]; then
-            echo "Unpacking $ZIP"
-            mkdir -p /tmp/project
-            unzip -o -q "$ZIP" -d /tmp/project
-          else
-            cp -r . /tmp/project
-          fi
+          mkdir -p /tmp/project
+          if [ -n "$ZIP" ]; then echo "Unpacking $ZIP"; unzip -o -q "$ZIP" -d /tmp/project; else cp -r . /tmp/project; fi
 
-      - name: Build
+      - name: Build Android .apk and Linux .deb
         run: |
-          SETTINGS=$(find /tmp/project -name settings.gradle.kts | head -1)
-          if [ -z "$SETTINGS" ]; then echo "settings.gradle.kts not found - upload is incomplete"; exit 1; fi
-          cd "$(dirname "$SETTINGS")"
-          echo "Building in $(pwd)"
-          gradle --no-daemon assembleRelease
-          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/HansViewer.apk"
+          BUILD=$(find /tmp/project -name build.sh -not -path '*/android/*' | head -1)
+          if [ -z "$BUILD" ]; then echo "build.sh not found - upload the new zip"; exit 1; fi
+          bash "$BUILD" "$GITHUB_WORKSPACE/out"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: HansViewer-apk
-          path: HansViewer.apk
+          name: HansViewer
+          path: out/*
 
-      - name: Publish as a release (easy download on the tablet)
+      - name: Publish as a release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: HansViewer for Android — build ${{ github.run_number }}
-          body: Download HansViewer.apk below on your tablet and open it to install or update.
-          files: HansViewer.apk
+          name: HansViewer — build ${{ github.run_number }}
+          body: |
+            Android: download HansViewer.apk on the tablet or phone and open it to install or update.
+            Linux: download the .deb and install it with: sudo apt install ./hansviewer_*_all.deb
+          files: out/*
           make_latest: true
